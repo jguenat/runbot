@@ -123,6 +123,9 @@ class Batch(models.Model):
         return link_type, build
 
     def _prepare(self, auto_rebase=False):
+        if not self.bundle_id.base_id:
+            # in some case the base can be detected lately. If a bundle has no base, recompute the base befor preparing
+            self.bundle_id._compute_base_id()
         for level, message in self.bundle_id.consistency_warning():
             if level == "warning":
                 self.warning("Bundle warning: %s" % message)
