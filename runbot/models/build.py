@@ -1128,5 +1128,5 @@ class BuildResult(models.Model):
                 if trigger.ci_context:
                     for build_commit in self.params_id.commit_link_ids:
                         commit = build_commit.commit_id
-                        if build_commit.match_type != 'default' and commit.repo_id in trigger.repo_ids:
+                        if 'base_' not in build_commit.match_type and commit.repo_id in trigger.repo_ids:
                             commit._github_status(build, trigger.ci_context, state, target_url, desc, post_commit)
