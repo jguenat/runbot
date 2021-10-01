@@ -4,6 +4,7 @@ import logging
 import re
 
 from collections import defaultdict
+from fnmatch import fnmatch
 from odoo import models, fields, api
 from odoo.exceptions import ValidationError
 
@@ -26,9 +27,12 @@ class BuildError(models.Model):
     fingerprint = fields.Char('Error fingerprint', index=True)
     random = fields.Boolean('underterministic error', tracking=True)
     responsible = fields.Many2one('res.users', 'Assigned fixer', tracking=True)
+    team_id = fields.Many2one('runbot.build.error.team', 'Assigned team')
     fixing_commit = fields.Char('Fixing commit', tracking=True)
+    fixing_pr = fields.Char('Fixing PR', tracking=True)
     build_ids = fields.Many2many('runbot.build', 'runbot_build_error_ids_runbot_build_rel', string='Affected builds')
     bundle_ids = fields.One2many('runbot.bundle', compute='_compute_bundle_ids')
+    version_ids = fields.One2many('runbot.version', compute='_compute_version_ids', string='Versions', search='_search_version')
     trigger_ids = fields.Many2many('runbot.trigger', compute='_compute_trigger_ids')
     active = fields.Boolean('Error is not fixed', default=True, tracking=True)
     tag_ids = fields.Many2many('runbot.build.error.tag', string='Tags')
@@ -57,6 +61,8 @@ class BuildError(models.Model):
         vals.update({'cleaned_content': cleaned_content,
                      'fingerprint': self._digest(cleaned_content)
         })
+        if not 'team_id' in vals and 'module_name' in vals:
+            vals.update({'team_id': self.env['runbot.build.error.team']._get_team(vals['module_name'])})
         return super().create(vals)
 
     def write(self, vals):
@@ -75,6 +81,11 @@ class BuildError(models.Model):
         for build_error in self:
             top_parent_builds = build_error.build_ids.mapped(lambda rec: rec and rec.top_parent)
             build_error.bundle_ids = top_parent_builds.mapped('slot_ids').mapped('batch_id.bundle_id')
+
+    @api.depends('build_ids', 'child_ids.build_ids')
+    def _compute_version_ids(self):
+        for build_error in self:
+            build_error.version_ids = build_error.build_ids.version_id
 
     @api.depends('build_ids')
     def _compute_trigger_ids(self):
@@ -184,6 +195,9 @@ class BuildError(models.Model):
     def disabling_tags(self):
         return ['-%s' % tag for tag in self.test_tags_list()]
 
+    def _search_version(self, operator, value):
+        return [('build_ids.version_id', operator, value)]
+
 
 class BuildErrorTag(models.Model):
 
@@ -217,4 +231,27 @@ class ErrorRegex(models.Model):
         for filter in self:
             if re.search(filter.regex, s):
                 return True
+        return False
+
+
+class BuildErrorTeam(models.Model):
+
+    _name = 'runbot.build.error.team'
+    _description = "Build Error Team"
+
+    name = fields.Char('Team')
+    build_error_ids = fields.One2many('runbot.build.error', 'team_id', string='Team Errors')
+    module_wildcards = fields.Char('Module Wildcards',
+        help='Comma separated list of `fnmatch` wildcards\n'
+        'Negative wildcards starting with a `-` can be used to discard some modules\n'
+        'e.g.: `*website*,-*website_sale*`')
+
+
+    @api.model
+    def _get_team(self, module_name):
+        for team in self.env['runbot.build.error.team'].search([('module_wildcards', '!=', False)]):
+            match = any([fnmatch(module_name, pattern.strip()) for pattern in team.module_wildcards.split(',') if not pattern.strip().startswith('-')])
+            unmatch = any([fnmatch(module_name, pattern.strip().strip('-')) for pattern in team.module_wildcards.split(',') if pattern.strip().startswith('-')])
+            if match and not unmatch:
+                return team.id
         return False

@@ -6,7 +6,7 @@
         <div class="container-fluid">
           <div class="row">
             <div class='col-md-12'>
-              <t t-if="current_user_errors">
+              <t t-if="current_user_errors and not team">
                 <h3>Your assigned bugs Bugs on Runbot Builds</h3>
                 <div class="accordion" id="userErrorAccordion">
                   <div class="card">
@@ -61,7 +61,11 @@
                   </t>
                 </div>
               </t>
-
+              <t t-if="team">
+                <div class="col-lg-12 text-center mb16">
+                  <h2><t t-esc="team.name"/></h2>
+                </div>
+              </t>
               <h3>Current Bugs on Runbot Builds</h3>
               <div class="container">
                 <nav class="navbar navbar-expand-lg navbar-light bg-light">

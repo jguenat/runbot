@@ -29,11 +29,17 @@ class TestBuildError(RunbotCase):
     def setUp(self):
         super(TestBuildError, self).setUp()
         self.BuildError = self.env['runbot.build.error']
+        self.BuildErrorTeam = self.env['runbot.build.error.team']
 
     def test_build_scan(self):
         IrLog = self.env['ir.logging']
         ko_build = self.create_test_build({'local_result': 'ko'})
         ok_build = self.create_test_build({'local_result': 'ok'})
+
+        error_team = self.BuildErrorTeam.create({
+            'name': 'test-error-team',
+            'module_wildcards': '*build-error-n*'
+        })
 
         log = {'message': RTE_ERROR,
                'build_id': ko_build.id,
@@ -54,6 +60,7 @@ class TestBuildError(RunbotCase):
         build_error = self.BuildError.search([('build_ids', 'in', [ko_build.id])])
         self.assertIn(ko_build, build_error.build_ids, 'The parsed build should be added to the runbot.build.error')
         self.assertFalse(self.BuildError.search([('build_ids', 'in', [ok_build.id])]), 'A successful build should not associated to a runbot.build.error')
+        self.assertEqual(error_team, build_error.team_id)
 
         # Test that build with same error is added to the errors
         ko_build_same_error = self.create_test_build({'local_result': 'ko'})
@@ -151,3 +158,15 @@ class TestBuildError(RunbotCase):
         # test that test tags on fixed errors are not taken into account
         self.assertNotIn('blah', self.BuildError.test_tags_list())
         self.assertNotIn('-blah', self.BuildError.disabling_tags())
+
+
+    def test_build_error_team_wildcards(self):
+        website_team = self.BuildErrorTeam.create({
+            'name': 'website',
+            'module_wildcards': '*website*,-*website_sale*'
+        })
+
+        self.assertFalse(self.BuildErrorTeam._get_team('odoo.addons.web_studio.tests.test_ui'))
+        self.assertFalse(self.BuildErrorTeam._get_team('odoo.addons.website_sale.tests.test_sale_process'))
+        self.assertEqual(website_team.id, self.BuildErrorTeam._get_team('odoo.addons.website_crm.tests.test_website_crm'))
+        self.assertEqual(website_team.id, self.BuildErrorTeam._get_team('odoo.addons.website.tests.test_ui'))
