@@ -80,6 +80,10 @@ FOR EACH ROW EXECUTE PROCEDURE runbot_set_logging_build();
         return pseudo_markdown(self.message)
 
 
+    def _known_error(self):
+        self.ensure_one()
+        return self.env['runbot.build.error']._known(self.message)
+
 class RunbotErrorLog(models.Model):
     _name = 'runbot.error.log'
     _description = "Error log"

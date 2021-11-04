@@ -127,6 +127,13 @@ class BuildError(models.Model):
         return hashlib.sha256(s.encode()).hexdigest()
 
     @api.model
+    def _known(self, log_message):
+        regexes = self.env['runbot.error.regex'].search([])
+        cleaning_regs = regexes.filtered(lambda r: r.re_type == 'cleaning')
+        fingerprint = self._digest(cleaning_regs.r_sub('%', log_message))
+        return self.env['runbot.build.error'].search([('fingerprint', '=', fingerprint), ('active', '=', True)])
+
+    @api.model
     def _parse_logs(self, ir_logs):
 
         regexes = self.env['runbot.error.regex'].search([])
@@ -240,6 +247,7 @@ class BuildErrorTeam(models.Model):
     _description = "Build Error Team"
 
     name = fields.Char('Team')
+    user_ids = fields.One2many('res.users', 'runbot_team_id', domain=[('share', '=', False)])
     build_error_ids = fields.One2many('runbot.build.error', 'team_id', string='Team Errors')
     module_wildcards = fields.Char('Module Wildcards',
         help='Comma separated list of `fnmatch` wildcards\n'

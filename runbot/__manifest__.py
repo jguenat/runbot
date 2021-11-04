@@ -48,7 +48,6 @@
         'views/host_views.xml',
         'views/repo_views.xml',
         'views/res_config_settings_views.xml',
-        'views/res_users.xml',
         'views/stat_views.xml',
         'views/upgrade.xml',
         'views/warning_views.xml',
