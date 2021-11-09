@@ -68,36 +68,67 @@
               </t>
               <t t-if="team">
                 <div class="col-lg-12 text-center mb16">
-                  <h2>
-                    <t t-esc="team.name.capitalize()"/>
+                  <h2>Team <t t-esc="team.name.capitalize()"/>
                     <a groups="base.group_user" t-attf-href="/web/#id={{team.id}}&amp;view_type=form&amp;model=runbot.build.error.team" target="new" title="View in Backend">
                       <i class="fa fa-list"/>
                     </a>
                   </h2>
                 </div>
-              </t>
-              <h3>Current Bugs on Runbot Builds</h3>
-              <div class="container">
-                <nav class="navbar navbar-expand-lg navbar-light bg-light">
-                  <div class="dropdown mr-auto">
-                    <a role="button" href="#" class="dropdown-toggle btn btn-secondary" data-toggle="dropdown">
-                      Sort By: <t t-esc="request.params.get('sort', '')"/>
-                    </a>
-                    <div class="dropdown-menu" aria-labelledby="sortMenuButton" role="menu">
-                      <t t-foreach="sort_order_choices" t-as="sort_choice">
-                        <a role="menuitem" class="dropdown-item" t-attf-href="/runbot/errors?sort={{sort_choice}}"><t t-esc="sort_order_choices[sort_choice]"/></a>
-                      </t>
+                <h3 t-if="team.dashboard_ids">Dashboards</h3>
+                <div class="row">
+                <t t-foreach="team.dashboard_ids" t-as="board">
+                  <div class="col-sm-3">
+                    <div class="card">
+                      <div class="card-header">
+                        <t t-esc="board.project_id.name"/> / <t t-esc="board.category_id.name"/> / <t t-esc="board.trigger_id.name"/>
+                        <t t-if="board.config_id"> / <t t-esc="board.config_id.name"/></t>
+                      </div>
+                      <div class="card-body">
+                        <t t-foreach="board.sticky_bundle_ids.sorted(lambda b: b.version_id.number, reverse=True)" t-as="bundle">
+                          <t t-set="failed_builds" t-value="board._get_bundle_builds(bundle.id)"/>
+                          <h4 class="card-title" t-if="failed_builds" t-esc="bundle.name"/>
+                          <p t-foreach="failed_builds" t-as="build" class="my-0">
+                              <a class="text-danger" t-attf-href="/runbot/build/{{build.id}}" target="new">
+                                <t t-esc="build.description or build.id"/>
+                              </a>
+                          </p>
+                        </t>
+                      </div>
                     </div>
                   </div>
-                  <span class="ml-auto">
-                      <t t-call="website.pager" />
-                  </span>
-                </nav>
-              </div>
+                </t>
+                </div>
+              </t>
 
-              <t t-call="runbot.build_error_cards">
-                <t t-set="build_errors" t-value="build_errors"/>
-                <t t-set="accordion_id">all_errors</t>
+              <h3>Current Bugs on Runbot Builds</h3>
+              <t t-if="build_errors">
+                <div class="container">
+                  <nav class="navbar navbar-expand-lg navbar-light bg-light">
+                    <div class="dropdown mr-auto">
+                      <a role="button" href="#" class="dropdown-toggle btn btn-secondary" data-toggle="dropdown">
+                        Sort By: <t t-esc="request.params.get('sort', '')"/>
+                      </a>
+                      <div class="dropdown-menu" aria-labelledby="sortMenuButton" role="menu">
+                        <t t-foreach="sort_order_choices" t-as="sort_choice">
+                          <a role="menuitem" class="dropdown-item" t-attf-href="/runbot/errors?sort={{sort_choice}}"><t t-esc="sort_order_choices[sort_choice]"/></a>
+                        </t>
+                      </div>
+                    </div>
+                    <span class="ml-auto">
+                        <t t-call="website.pager" />
+                    </span>
+                  </nav>
+                </div>
+
+                <t t-call="runbot.build_error_cards">
+                  <t t-set="build_errors" t-value="build_errors"/>
+                  <t t-set="accordion_id">all_errors</t>
+                </t>
+              </t>
+              <t t-else="">
+                <div class="card bg-success">
+                  <div class="card-body text-center"><h3>👍 No Bugs !</h3></div>
+                </div>
               </t>
             </div>
           </div>

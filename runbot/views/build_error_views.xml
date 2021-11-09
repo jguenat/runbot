@@ -196,6 +196,9 @@
                 <page string="Team Errors">
                   <field name="build_error_ids" nolabel="1" widget="many2many" options="{'not_delete': True, 'no_create': True}"/>
                 </page>
+                <page string="Team Dashboards">
+                  <field name="dashboard_ids" nolabel="1" widget="many2many" options="{'not_delete': True, 'no_create': True}"/>
+                </page>
                 <page string="Team Members">
                   <field name="user_ids" nolabel="1" widget="many2many" options="{'not_delete': True, 'no_create': True}"/>
                 </page>
@@ -217,6 +220,45 @@
         </field>
     </record>
 
+    <record id="build_error_team_dashboard_form" model="ir.ui.view">
+        <field name="name">runbot.build.error.team.dashboard.form</field>
+        <field name="model">runbot.build.error.team.dashboard</field>
+        <field name="arch" type="xml">
+          <form>
+            <sheet>
+              <group name="build_error_team_dashboard_group">
+                <field name="team_id"/>
+                <field name="project_id"/>
+                <field name="category_id"/>
+                <field name="trigger_id"/>
+                <field name="config_id"/>
+                <field name="check_sub_builds"/>
+              </group>
+              <notebook>
+                <page string="Builds Found">
+                  <field name="failed_build_ids" nolabel="1" widget="many2many" options="{'not_delete': True, 'no_create': True}"/>
+                </page>
+              </notebook>
+            </sheet>
+          </form>
+        </field>
+    </record>
+
+    <record id="build_error_team_dashboard_tree" model="ir.ui.view">
+      <field name="name">runbot.build.error.team.dashboard.tree</field>
+        <field name="model">runbot.build.error.team.dashboard</field>
+        <field name="arch" type="xml">
+            <tree string="Runbot Error Teams Dashboards">
+                <field name="team_id"/>
+                <field name="project_id"/>
+                <field name="category_id"/>
+                <field name="trigger_id"/>
+                <field name="config_id"/>
+                <field name="check_sub_builds"/>
+            </tree>
+        </field>
+    </record>
+
     <record id="open_view_error_regex" model="ir.actions.act_window">
         <field name="name">Errors regex</field>
         <field name="res_model">runbot.error.regex</field>
@@ -226,6 +268,12 @@
     <record id="open_view_error_team" model="ir.actions.act_window">
         <field name="name">Errors Teams</field>
         <field name="res_model">runbot.build.error.team</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <record id="open_view_error_team_dashboard" model="ir.actions.act_window">
+        <field name="name">Errors Teams Dashboards</field>
+        <field name="res_model">runbot.build.error.team.dashboard</field>
         <field name="view_mode">tree,form</field>
     </record>
 
@@ -258,6 +306,13 @@
         parent="runbot_menu_manage_errors"
         sequence="30"
         action="open_view_error_team"
+        />
+    <menuitem
+        name="Error Teams Dashboards"
+        id="runbot_menu_error_team_dashboard_tree"
+        parent="runbot_menu_manage_errors"
+        sequence="40"
+        action="open_view_error_team_dashboard"
         />
   </data>
 </odoo>
