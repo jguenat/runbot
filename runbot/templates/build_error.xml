@@ -80,12 +80,11 @@
                   <div class="col-sm-3">
                     <div class="card">
                       <div class="card-header">
-                        <t t-esc="board.project_id.name"/> / <t t-esc="board.category_id.name"/> / <t t-esc="board.trigger_id.name"/>
-                        <t t-if="board.config_id"> / <t t-esc="board.config_id.name"/></t>
+                        <t t-esc="board.display_name"/>
                       </div>
                       <div class="card-body">
                         <t t-foreach="board.sticky_bundle_ids.sorted(lambda b: b.version_id.number, reverse=True)" t-as="bundle">
-                          <t t-set="failed_builds" t-value="board._get_bundle_builds(bundle.id)"/>
+                          <t t-set="failed_builds" t-value="board.build_ids.filtered(lambda b: b.top_parent.slot_ids.batch_id.bundle_id == bundle)"/>
                           <h4 class="card-title" t-if="failed_builds" t-esc="bundle.name"/>
                           <p t-foreach="failed_builds" t-as="build" class="my-0">
                               <a class="text-danger" t-attf-href="/runbot/build/{{build.id}}" target="new">

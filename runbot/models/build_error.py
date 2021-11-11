@@ -7,6 +7,7 @@ from collections import defaultdict
 from fnmatch import fnmatch
 from odoo import models, fields, api
 from odoo.exceptions import ValidationError
+from odoo.tools.safe_eval import safe_eval
 
 _logger = logging.getLogger(__name__)
 
@@ -270,14 +271,21 @@ class BuildErrorTeamDashboard(models.Model):
     _name = 'runbot.build.error.team.dashboard'
     _description = "Build Error Team Dashboard"
 
+    display_name = fields.Char(compute='_compute_display_name')
     team_id = fields.Many2one('runbot.build.error.team', 'Team')
     project_id = fields.Many2one('runbot.project', 'Project', help='Project to monitor', required=True, default=lambda self: self.env.ref('runbot.main_project'))
     category_id = fields.Many2one('runbot.category', 'Category', help='Trigger Category to monitor', required=True)
     trigger_id = fields.Many2one('runbot.trigger', 'Trigger', help='Trigger to monitor in chosen category', required=True)
     config_id = fields.Many2one('runbot.build.config', 'Config', help='Select a sub_build with this config')
     check_sub_builds = fields.Boolean('Check Sub Builds', default=False, help='Check the sub_builds for the results')
-    sticky_bundle_ids = fields.One2many('runbot.bundle', compute='_compute_sticky_bundle_ids', string='Sticky Bundles')
-    failed_build_ids = fields.One2many('runbot.build', compute='_compute_build_ids', string='Builds')
+    domain_filter = fields.Char('Domain Filter', help='If present, will be applied on builds', default="[('global_result', '=', 'ko')]")
+    sticky_bundle_ids = fields.Many2many('runbot.bundle', compute='_compute_sticky_bundle_ids', string='Sticky Bundles')
+    build_ids = fields.Many2many('runbot.build', compute='_compute_build_ids', string='Builds')
+
+    @api.depends('project_id', 'category_id', 'trigger_id', 'config_id')
+    def _compute_display_name(self):
+        for board in self:
+            board.display_name = f'{board.project_id.name} / {board.category_id.name} / {board.trigger_id.name}{board.config_id and " / " or ""}{board.config_id and board.config_id.name or ""}'
 
     @api.depends('project_id')
     def _compute_sticky_bundle_ids(self):
@@ -285,30 +293,23 @@ class BuildErrorTeamDashboard(models.Model):
         for dashboard in self:
             dashboard.sticky_bundle_ids = sticky_bundles.filtered(lambda b: b.project_id == dashboard.project_id)
 
-    @api.depends('project_id', 'category_id', 'trigger_id', 'config_id')
+    @api.depends('project_id', 'category_id', 'trigger_id', 'config_id', 'domain_filter')
     def _compute_build_ids(self):
-        sticky_bundles = self.env['runbot.bundle'].search([('sticky', '=', True)])
         default_category_id = self.env['ir.model.data'].xmlid_to_res_id('runbot.default_category')
         for dashboard in self:
-            bundles = sticky_bundles.filtered(lambda bundle: bundle.project_id == dashboard.project_id)
             category_id = dashboard.category_id.id or default_category_id
-            builds = bundles.with_context(category_id=category_id).last_done_batch.mapped(
-                'slot_ids'
-                ).filtered(
-                    lambda slot: slot.trigger_id == dashboard.trigger_id).build_id.filtered(lambda b: b.global_result == 'ko')
+            last_done_batch_ids = dashboard.sticky_bundle_ids.with_context(category_id=category_id).last_done_batch
+            if dashboard.trigger_id:
+                all_build_ids = last_done_batch_ids.slot_ids.filtered(lambda s: s.trigger_id == dashboard.trigger_id).all_build_ids
+            else:
+                all_build_ids = last_done_batch_ids.all_build_ids
+
+            domain = [('global_result', '=', 'ko')]
             if dashboard.config_id:
-                builds = builds.children_ids.filtered(lambda b: b.config_id == dashboard.config_id)
+                domain.append(('config_id', '=', dashboard.config_id.id))
+            builds = all_build_ids.filtered_domain(domain)
             if dashboard.check_sub_builds:
                 builds = builds.children_ids
-            dashboard.failed_build_ids = builds.filtered(lambda b: b.global_result == 'ko')
-
-    def _get_bundle_builds(self, bundle_id):
-        self.ensure_one()
-        bundle = self.env['runbot.bundle'].browse(bundle_id)
-        batch = bundle.with_context(category_id=self.category_id.id).last_done_batch
-        builds = batch.mapped('slot_ids').filtered(lambda slot: slot.trigger_id == self.trigger_id).build_id
-        if self.config_id:
-            builds = builds.children_ids.filtered(lambda b: b.config_id == self.config_id)
-        if self.check_sub_builds:
-            builds = builds.children_ids
-        return builds.filtered(lambda b: b.global_result == 'ko')
+            if dashboard.domain_filter:
+                builds = builds.filtered_domain(safe_eval(dashboard.domain_filter))
+            dashboard.build_ids = builds

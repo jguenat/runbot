@@ -233,10 +233,11 @@
                 <field name="trigger_id"/>
                 <field name="config_id"/>
                 <field name="check_sub_builds"/>
+                <field name="domain_filter"/>
               </group>
               <notebook>
                 <page string="Builds Found">
-                  <field name="failed_build_ids" nolabel="1" widget="many2many" options="{'not_delete': True, 'no_create': True}"/>
+                  <field name="build_ids" nolabel="1" widget="many2many" options="{'not_delete': True, 'no_create': True}"/>
                 </page>
               </notebook>
             </sheet>
