@@ -354,8 +354,8 @@ class Runbot(Controller):
 
     @route(['/runbot/errors',
             '/runbot/errors/page/<int:page>',
-            '/runbot/errors/<model("runbot.build.error.team"):team>',
-            '/runbot/errors/<model("runbot.build.error.team"):team>/<int:page>'
+            '/runbot/errors/<model("runbot.team"):team>',
+            '/runbot/errors/<model("runbot.team"):team>/<int:page>'
             ], type='http', auth='user', website=True, sitemap=False)
     def build_errors(self, team=None, sort=None, page=1, limit=20, **kwargs):
         sort_order_choices = {
@@ -395,6 +395,13 @@ class Runbot(Controller):
             'pager': pager
         }
         return request.render('runbot.build_error', qctx)
+
+    @route(['/runbot/teams/<model("runbot.team"):team>',], type='http', auth='user', website=True, sitemap=False)
+    def build_team_dashboards(self, team=None, **kwargs):
+        qctx = {
+            'team': team,
+        }
+        return request.render('runbot.team', qctx)
 
     @route(['/runbot/build/stats/<int:build_id>'], type='http', auth="public", website=True, sitemap=False)
     def build_stats(self, build_id, search=None, **post):

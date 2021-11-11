@@ -182,13 +182,13 @@
       </field>
     </record>
 
-    <record id="build_error_team_form" model="ir.ui.view">
-        <field name="name">runbot.build.error.team.form</field>
-        <field name="model">runbot.build.error.team</field>
+    <record id="team_form" model="ir.ui.view">
+        <field name="name">runbot.team.form</field>
+        <field name="model">runbot.team</field>
         <field name="arch" type="xml">
           <form>
             <sheet>
-              <group name="build_error_team_group">
+              <group name="team_group">
                 <field name="name"/>
                 <field name="module_wildcards"/>
               </group>
@@ -208,11 +208,11 @@
         </field>
     </record>
 
-    <record id="build_error_team_tree" model="ir.ui.view">
-      <field name="name">runbot.build.error.team.tree</field>
-        <field name="model">runbot.build.error.team</field>
+    <record id="team_tree" model="ir.ui.view">
+      <field name="name">runbot.team.tree</field>
+        <field name="model">runbot.team</field>
         <field name="arch" type="xml">
-            <tree string="Runbot Error Teams">
+            <tree string="Runbot Teams">
                 <field name="name"/>
                 <field name="module_wildcards"/>
                 <field name="build_error_ids"/>
@@ -220,13 +220,13 @@
         </field>
     </record>
 
-    <record id="build_error_team_dashboard_form" model="ir.ui.view">
-        <field name="name">runbot.build.error.team.dashboard.form</field>
-        <field name="model">runbot.build.error.team.dashboard</field>
+    <record id="team_dashboard_form" model="ir.ui.view">
+        <field name="name">runbot.team.dashboard.form</field>
+        <field name="model">runbot.team.dashboard</field>
         <field name="arch" type="xml">
           <form>
             <sheet>
-              <group name="build_error_team_dashboard_group">
+              <group name="team_dashboard_group">
                 <field name="team_id"/>
                 <field name="project_id"/>
                 <field name="category_id"/>
@@ -245,11 +245,11 @@
         </field>
     </record>
 
-    <record id="build_error_team_dashboard_tree" model="ir.ui.view">
-      <field name="name">runbot.build.error.team.dashboard.tree</field>
-        <field name="model">runbot.build.error.team.dashboard</field>
+    <record id="team_dashboard_tree" model="ir.ui.view">
+      <field name="name">runbot.team.dashboard.tree</field>
+        <field name="model">runbot.team.dashboard</field>
         <field name="arch" type="xml">
-            <tree string="Runbot Error Teams Dashboards">
+            <tree string="Runbot Teams Dashboards">
                 <field name="team_id"/>
                 <field name="project_id"/>
                 <field name="category_id"/>
@@ -266,15 +266,15 @@
         <field name="view_mode">tree,form</field>
     </record>
 
-    <record id="open_view_error_team" model="ir.actions.act_window">
-        <field name="name">Errors Teams</field>
-        <field name="res_model">runbot.build.error.team</field>
+    <record id="open_view_runbot_team" model="ir.actions.act_window">
+        <field name="name">Runbot Teams</field>
+        <field name="res_model">runbot.team</field>
         <field name="view_mode">tree,form</field>
     </record>
 
-    <record id="open_view_error_team_dashboard" model="ir.actions.act_window">
-        <field name="name">Errors Teams Dashboards</field>
-        <field name="res_model">runbot.build.error.team.dashboard</field>
+    <record id="open_view_runbot_team_dashboard" model="ir.actions.act_window">
+        <field name="name">Runbot Teams Dashboards</field>
+        <field name="res_model">runbot.team.dashboard</field>
         <field name="view_mode">tree,form</field>
     </record>
 
@@ -302,18 +302,18 @@
         />
 
     <menuitem
-        name="Error Teams"
-        id="runbot_menu_error_team_tree"
+        name="Runbot Teams"
+        id="runbot_menu_team_tree"
         parent="runbot_menu_manage_errors"
         sequence="30"
-        action="open_view_error_team"
+        action="open_view_runbot_team"
         />
     <menuitem
-        name="Error Teams Dashboards"
-        id="runbot_menu_error_team_dashboard_tree"
+        name="Runbot Teams Dashboards"
+        id="runbot_menu_runbot_team_dashboard_tree"
         parent="runbot_menu_manage_errors"
         sequence="40"
-        action="open_view_error_team_dashboard"
+        action="open_view_runbot_team_dashboard"
         />
   </data>
 </odoo>

@@ -29,7 +29,7 @@ class TestBuildError(RunbotCase):
     def setUp(self):
         super(TestBuildError, self).setUp()
         self.BuildError = self.env['runbot.build.error']
-        self.BuildErrorTeam = self.env['runbot.build.error.team']
+        self.BuildErrorTeam = self.env['runbot.team']
 
     def test_build_scan(self):
         IrLog = self.env['ir.logging']

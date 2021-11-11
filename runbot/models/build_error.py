@@ -28,7 +28,7 @@ class BuildError(models.Model):
     fingerprint = fields.Char('Error fingerprint', index=True)
     random = fields.Boolean('underterministic error', tracking=True)
     responsible = fields.Many2one('res.users', 'Assigned fixer', tracking=True)
-    team_id = fields.Many2one('runbot.build.error.team', 'Assigned team')
+    team_id = fields.Many2one('runbot.team', 'Assigned team')
     fixing_commit = fields.Char('Fixing commit', tracking=True)
     fixing_pr = fields.Char('Fixing PR', tracking=True)
     build_ids = fields.Many2many('runbot.build', 'runbot_build_error_ids_runbot_build_rel', string='Affected builds')
@@ -63,7 +63,7 @@ class BuildError(models.Model):
                      'fingerprint': self._digest(cleaned_content)
         })
         if not 'team_id' in vals and 'module_name' in vals:
-            vals.update({'team_id': self.env['runbot.build.error.team']._get_team(vals['module_name'])})
+            vals.update({'team_id': self.env['runbot.team']._get_team(vals['module_name'])})
         return super().create(vals)
 
     def write(self, vals):
@@ -244,8 +244,8 @@ class ErrorRegex(models.Model):
 
 class BuildErrorTeam(models.Model):
 
-    _name = 'runbot.build.error.team'
-    _description = "Build Error Team"
+    _name = 'runbot.team'
+    _description = "Runbot Team"
 
     name = fields.Char('Team')
     user_ids = fields.One2many('res.users', 'runbot_team_id', domain=[('share', '=', False)])
@@ -254,11 +254,11 @@ class BuildErrorTeam(models.Model):
         help='Comma separated list of `fnmatch` wildcards\n'
         'Negative wildcards starting with a `-` can be used to discard some modules\n'
         'e.g.: `*website*,-*website_sale*`')
-    dashboard_ids = fields.One2many('runbot.build.error.team.dashboard', 'team_id', string='Dashboards')
+    dashboard_ids = fields.One2many('runbot.team.dashboard', 'team_id', string='Dashboards')
 
     @api.model
     def _get_team(self, module_name):
-        for team in self.env['runbot.build.error.team'].search([('module_wildcards', '!=', False)]):
+        for team in self.env['runbot.team'].search([('module_wildcards', '!=', False)]):
             match = any([fnmatch(module_name, pattern.strip()) for pattern in team.module_wildcards.split(',') if not pattern.strip().startswith('-')])
             unmatch = any([fnmatch(module_name, pattern.strip().strip('-')) for pattern in team.module_wildcards.split(',') if pattern.strip().startswith('-')])
             if match and not unmatch:
@@ -268,14 +268,14 @@ class BuildErrorTeam(models.Model):
 
 class BuildErrorTeamDashboard(models.Model):
 
-    _name = 'runbot.build.error.team.dashboard'
-    _description = "Build Error Team Dashboard"
+    _name = 'runbot.team.dashboard'
+    _description = "Runbot Team Dashboard"
 
     display_name = fields.Char(compute='_compute_display_name')
-    team_id = fields.Many2one('runbot.build.error.team', 'Team')
+    team_id = fields.Many2one('runbot.team', 'Team')
     project_id = fields.Many2one('runbot.project', 'Project', help='Project to monitor', required=True, default=lambda self: self.env.ref('runbot.main_project'))
     category_id = fields.Many2one('runbot.category', 'Category', help='Trigger Category to monitor', required=True)
-    trigger_id = fields.Many2one('runbot.trigger', 'Trigger', help='Trigger to monitor in chosen category', required=True)
+    trigger_id = fields.Many2one('runbot.trigger', 'Trigger', help='Trigger to monitor in chosen category')
     config_id = fields.Many2one('runbot.build.config', 'Config', help='Select a sub_build with this config')
     check_sub_builds = fields.Boolean('Check Sub Builds', default=False, help='Check the sub_builds for the results')
     domain_filter = fields.Char('Domain Filter', help='If present, will be applied on builds', default="[('global_result', '=', 'ko')]")
@@ -285,7 +285,8 @@ class BuildErrorTeamDashboard(models.Model):
     @api.depends('project_id', 'category_id', 'trigger_id', 'config_id')
     def _compute_display_name(self):
         for board in self:
-            board.display_name = f'{board.project_id.name} / {board.category_id.name} / {board.trigger_id.name}{board.config_id and " / " or ""}{board.config_id and board.config_id.name or ""}'
+            names = [board.project_id.name, board.category_id.name,board.trigger_id.name, board.config_id.name]
+            board.display_name = ' / '.join([n for n in names if n])
 
     @api.depends('project_id')
     def _compute_sticky_bundle_ids(self):

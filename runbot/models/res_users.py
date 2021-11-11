@@ -7,4 +7,4 @@ from odoo import fields, models
 class ResUsers(models.Model):
     _inherit = 'res.users'
 
-    runbot_team_id = fields.Many2one('runbot.build.error.team', "Runbot Team")
+    runbot_team_id = fields.Many2one('runbot.team', "Runbot Team")
