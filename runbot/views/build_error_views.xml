@@ -234,6 +234,7 @@
                 <field name="config_id"/>
                 <field name="check_sub_builds"/>
                 <field name="domain_filter"/>
+                <field name="custom_template_id" groups="runbot.group_runbot_admin"/>
               </group>
               <notebook>
                 <page string="Builds Found">

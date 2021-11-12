@@ -131,9 +131,7 @@
               <h3 t-if="team.dashboard_ids">Dashboards</h3>
               <div class="row">
                 <t t-foreach="team.dashboard_ids" t-as="board">
-                  <t t-call="runbot.team_dashboard">
-                    <t t-set="board" t-value="board"/>
-                  </t>
+                  <t t-raw="board.custom_template_id.render({'board': board})"/>
                 </t>
               </div>
               <h3 t-if="team.build_error_ids">Team assigned Errors</h3>

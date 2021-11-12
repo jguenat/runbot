@@ -279,6 +279,8 @@ class BuildErrorTeamDashboard(models.Model):
     config_id = fields.Many2one('runbot.build.config', 'Config', help='Select a sub_build with this config')
     check_sub_builds = fields.Boolean('Check Sub Builds', default=False, help='Check the sub_builds for the results')
     domain_filter = fields.Char('Domain Filter', help='If present, will be applied on builds', default="[('global_result', '=', 'ko')]")
+    custom_template_id = fields.Many2one('ir.ui.view', help='Change for a custom Dasbord card template',
+        domain=[('type', '=', 'qweb')], default=lambda self: self.env.ref('runbot.team_dashboard'))
     sticky_bundle_ids = fields.Many2many('runbot.bundle', compute='_compute_sticky_bundle_ids', string='Sticky Bundles')
     build_ids = fields.Many2many('runbot.build', compute='_compute_build_ids', string='Builds')
 
