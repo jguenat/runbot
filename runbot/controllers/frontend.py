@@ -353,9 +353,7 @@ class Runbot(Controller):
         return request.render(view_id if view_id else "runbot.monitoring", qctx)
 
     @route(['/runbot/errors',
-            '/runbot/errors/page/<int:page>',
-            '/runbot/errors/<model("runbot.team"):team>',
-            '/runbot/errors/<model("runbot.team"):team>/<int:page>'
+            '/runbot/errors/page/<int:page>'
             ], type='http', auth='user', website=True, sitemap=False)
     def build_errors(self, team=None, sort=None, page=1, limit=20, **kwargs):
         sort_order_choices = {
@@ -377,8 +375,6 @@ class Runbot(Controller):
         ], order='last_seen_date desc, build_count desc')
 
         domain = [('parent_id', '=', False), ('responsible', '!=', request.env.user.id), ('build_count', '>', 1)]
-        if team:
-            domain += [('team_id', '=', team.id)]
         build_errors_count = request.env['runbot.build.error'].search_count(domain)
         url_args = {}
         url_args['sort'] = sort
@@ -391,7 +387,6 @@ class Runbot(Controller):
             'build_errors': build_errors,
             'title': 'Build Errors',
             'sort_order_choices': sort_order_choices,
-            'team': team,
             'pager': pager
         }
         return request.render('runbot.build_error', qctx)
