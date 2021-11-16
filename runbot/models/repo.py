@@ -463,7 +463,7 @@ class Repo(models.Model):
         """ Find new commits in physical repos"""
         updated = False
         for repo in self:
-            if repo.remote_ids and self._update(poll_delay=30 if force else 60*5):
+            if repo.remote_ids and self._update(poll_delay=30 if force else 60*60):
                 max_age = int(self.env['ir.config_parameter'].get_param('runbot.runbot_max_age', default=30))
                 ref = repo._get_refs(max_age, ignore=ignore)
                 ref_branches = repo._find_or_create_branches(ref)
@@ -497,7 +497,7 @@ class Repo(models.Model):
             self._update_git_config()
             return True
 
-    def _update_git(self, force=False, poll_delay=5*60):
+    def _update_git(self, force=False, poll_delay=60*60):
         """ Update the git repo on FS """
         self.ensure_one()
         repo = self
@@ -544,7 +544,7 @@ class Repo(models.Model):
                     host.disable()
         return success
 
-    def _update(self, force=False, poll_delay=5*60):
+    def _update(self, force=False, poll_delay=60*60):
         """ Update the physical git reposotories on FS"""
         for repo in self:
             try:
