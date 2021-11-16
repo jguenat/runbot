@@ -1099,13 +1099,13 @@ class BuildResult(models.Model):
                 else:
                     build.parent_id._github_status(post_commit)
             elif build.params_id.config_id == build.params_id.trigger_id.config_id:
-                if build.global_result in ('ko', 'warn'):
+                if build.global_result == 'ko':
                     state = 'failure'
                 elif build.global_state in ('pending', 'testing'):
                     state = 'pending'
                 elif build.global_state in ('running', 'done'):
                     state = 'error'
-                    if build.global_result == 'ok':
+                    if build.global_result in ('ok','warn'):
                         state = 'success'
                 else:
                     _logger.info("skipping github status for build %s ", build.id)
