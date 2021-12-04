@@ -403,6 +403,13 @@ def make_repo(capsys, request, config, tunnel, users):
             # 'allow_merge_commit': False,
             'allow_rebase_merge': False,
         }))
+        r = r.json()
+        # wait for repository visibility
+        while True:
+            time.sleep(1)
+            if github.head(r['url']).ok:
+                break
+
         repo = Repo(github, fullname, repos)
 
         # create webhook
@@ -415,6 +422,7 @@ def make_repo(capsys, request, config, tunnel, users):
             },
             'events': ['pull_request', 'issue_comment', 'status', 'pull_request_review']
         }))
+        time.sleep(1)
 
         check(github.put('{}/contents/{}'.format(repo_url, 'a'), json={
             'path': 'a',
@@ -422,8 +430,7 @@ def make_repo(capsys, request, config, tunnel, users):
             'content': base64.b64encode(b'whee').decode('ascii'),
             'branch': 'garbage_%s' % uuid.uuid4()
         }))
-        # try to unwatch repo, doesn't actually work
-        repo.unsubscribe()
+        time.sleep(1)
         return repo
 
     yield repomaker
@@ -643,17 +650,18 @@ class Repo:
 
         hashes = []
         for commit in commits:
-            if commit.reset:
-                tree = None
-            r = self._session.post('https://api.github.com/repos/{}/git/trees'.format(self.name), json={
-                'tree': [
-                    {'path': k, 'mode': '100644', 'type': 'blob', 'content': v}
-                    for k, v in commit.tree.items()
-                ],
-                'base_tree': tree
-            })
-            assert r.ok, r.text
-            tree = r.json()['sha']
+            if commit.tree:
+                if commit.reset:
+                    tree = None
+                r = self._session.post('https://api.github.com/repos/{}/git/trees'.format(self.name), json={
+                    'tree': [
+                        {'path': k, 'mode': '100644', 'type': 'blob', 'content': v}
+                        for k, v in commit.tree.items()
+                    ],
+                    'base_tree': tree
+                })
+                assert r.ok, r.text
+                tree = r.json()['sha']
 
             data = {
                 'parents': parents,

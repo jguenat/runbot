@@ -210,6 +210,7 @@ class PullRequests(models.Model):
         for pr in self:
             pr.refname = pr.label.split(':', 1)[-1]
 
+    @api.model_create_single
     def create(self, vals):
         # PR opened event always creates a new PR, override so we can precreate PRs
         existing = self.search([
@@ -645,7 +646,7 @@ class PullRequests(models.Model):
             r = gh.post(f'https://api.github.com/repos/{pr.repository.name}/pulls', json={
                 'base': target.name,
                 'head': f'{owner}:{new_branch}',
-                'title': '[FW]' + title,
+                'title': '[FW]' + (' ' if title[0] != '[' else '') + title,
                 'body': body
             })
             if not r.ok:
