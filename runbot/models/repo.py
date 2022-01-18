@@ -242,6 +242,7 @@ class Repo(models.Model):
     last_processed_hook_time = fields.Float('Last processed hook time')
     get_ref_time = fields.Float('Last refs db update', compute='_compute_get_ref_time')
     trigger_ids = fields.Many2many('runbot.trigger', relation='runbot_trigger_triggers', readonly=True)
+    single_version = fields.Many2one('runbot.version', "Single version", help="Limit the repo to a single version for non versionned repo")
     forbidden_regex = fields.Char('Forbidden regex', help="Regex that forid bundle creation if branch name is matching", tracking=True)
     invalid_branch_message = fields.Char('Forbidden branch message', tracking=True)
 
@@ -365,7 +366,7 @@ class Repo(models.Model):
                 if not git_refs:
                     return []
                 refs = [tuple(field for field in line.split('\x00')) for line in git_refs.split('\n')]
-                refs = [r for r in refs if dateutil.parser.parse(r[2][:19]) + datetime.timedelta(days=max_age) > datetime.datetime.now()]
+                refs = [r for r in refs if dateutil.parser.parse(r[2][:19]) + datetime.timedelta(days=max_age) > datetime.datetime.now() or self.env['runbot.branch'].match_is_base(r[0])]
                 if ignore:
                     refs = [r for r in refs if r[0].split('/')[-1] not in ignore]
                 return refs
@@ -441,9 +442,6 @@ class Repo(models.Model):
                     message = branch.remote_id.repo_id.invalid_branch_message or message
                     branch.head._github_status(False, "Branch naming", 'failure', False, message)
 
-                if not self.trigger_ids:
-                    continue
-
                 bundle = branch.bundle_id
                 if bundle.no_build:
                     continue
@@ -474,6 +472,9 @@ class Repo(models.Model):
     def _update_git_config(self):
         """ Update repo git config file """
         for repo in self:
+            if repo.mode == 'disabled':
+                _logger.info(f'skipping disabled repo {repo.name}')
+                continue
             if os.path.isdir(os.path.join(repo.path, 'refs')):
                 git_config_path = os.path.join(repo.path, 'config')
                 template_params = {'repo': repo}

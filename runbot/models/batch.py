@@ -51,8 +51,7 @@ class Batch(models.Model):
 
     def _url(self):
         self.ensure_one()
-        runbot_domain = self.env['runbot.runbot']._domain()
-        return "http://%s/runbot/batch/%s" % (runbot_domain, self.id)
+        return "/runbot/batch/%s" % self.id
 
     def _new_commit(self, branch, match_type='new'):
         # if not the same hash for repo:
@@ -83,12 +82,15 @@ class Batch(models.Model):
             for slot in batch.slot_ids:
                 slot.skipped = True
                 build = slot.build_id
+                if build.global_state in ('running', 'done'):
+                    continue
                 testing_slots = build.slot_ids.filtered(lambda s: not s.skipped)
                 if not testing_slots:
                     if build.global_state == 'pending':
                         build._skip('Newer build found')
                     elif build.global_state in ('waiting', 'testing'):
-                        build.killable = True
+                        if not build.killable:
+                            build.killable = True
                 elif slot.link_type == 'created':
                     batches = testing_slots.mapped('batch_id')
                     _logger.info('Cannot skip build %s build is still in use in batches %s', build.id, batches.ids)
@@ -97,12 +99,17 @@ class Batch(models.Model):
                         batch._log('Cannot kill or skip build %s, build is used in another bundle: %s', build.id, bundles.mapped('name'))
 
     def _process(self):
+        processed = self.browse()
         for batch in self:
             if batch.state == 'preparing' and batch.last_update < fields.Datetime.now() - datetime.timedelta(seconds=60):
                 batch._prepare()
+                processed |= batch
             elif batch.state == 'ready' and all(slot.build_id.global_state in (False, 'running', 'done') for slot in batch.slot_ids):
+                _logger.info('Batch %s is done', self.id)
                 batch._log('Batch done')
                 batch.state = 'done'
+                processed |= batch
+        return processed
 
     def _create_build(self, params):
         """
@@ -112,7 +119,8 @@ class Batch(models.Model):
         build = self.env['runbot.build'].search([('params_id', '=', params.id), ('parent_id', '=', False)], limit=1, order='id desc')
         link_type = 'matched'
         if build:
-            build.killable = False
+            if build.killable:
+                build.killable = False
         else:
             description = params.trigger_id.description if params.trigger_id.description else False
             link_type = 'created'
@@ -130,12 +138,15 @@ class Batch(models.Model):
         return link_type, build
 
     def _prepare(self, auto_rebase=False):
+        _logger.info('Preparing batch %s', self.id)
+        if not self.bundle_id.base_id:
+            # in some case the base can be detected lately. If a bundle has no base, recompute the base before preparing
+            self.bundle_id._compute_base_id()
         for level, message in self.bundle_id.consistency_warning():
             if level == "warning":
                 self.warning("Bundle warning: %s" % message)
 
         self.state = 'ready'
-        _logger.info('Preparing batch %s', self.id)
 
         bundle = self.bundle_id
         project = bundle.project_id

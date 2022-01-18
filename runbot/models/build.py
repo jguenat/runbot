@@ -142,6 +142,7 @@ class BuildResult(models.Model):
 
     description = fields.Char('Description', help='Informative description')
     md_description = fields.Char(compute='_compute_md_description', String='MD Parsed Description', help='Informative description markdown parsed')
+    display_name = fields.Char(compute='_compute_display_name')
 
     # Related fields for convenience
     version_id = fields.Many2one('runbot.version', related='params_id.version_id', store=True, index=True)
@@ -175,6 +176,7 @@ class BuildResult(models.Model):
     job_end = fields.Datetime('Job end')
     build_start = fields.Datetime('Build start')
     build_end = fields.Datetime('Build end')
+    docker_start = fields.Datetime('Docker start')
     job_time = fields.Integer(compute='_compute_job_time', string='Job time')
     build_time = fields.Integer(compute='_compute_build_time', string='Build time')
 
@@ -200,6 +202,7 @@ class BuildResult(models.Model):
     parent_id = fields.Many2one('runbot.build', 'Parent Build', index=True)
     parent_path = fields.Char('Parent path', index=True)
     top_parent =  fields.Many2one('runbot.build', compute='_compute_top_parent')
+    ancestors =  fields.Many2many('runbot.build', compute='_compute_ancestors')
     # should we add a has children stored boolean?
     children_ids = fields.One2many('runbot.build', 'parent_id')
 
@@ -218,6 +221,11 @@ class BuildResult(models.Model):
     database_ids = fields.One2many('runbot.database', 'build_id')
 
     static_run = fields.Char('Static run URL')
+
+    @api.depends('description', 'params_id.config_id')
+    def _compute_display_name(self):
+        for build in self:
+            build.display_name = build.description or build.config_id.name
 
     @api.depends('params_id.config_id')
     def _compute_log_list(self):  # storing this field because it will be access trhoug repo viewn and keep track of the list at create
@@ -258,6 +266,10 @@ class BuildResult(models.Model):
     def _compute_top_parent(self):
         for build in self:
             build.top_parent = self.browse(int(build.parent_path.split('/')[0]))
+
+    def _compute_ancestors(self):
+        for build in self:
+            build.ancestors = self.browse([int(b) for b in build.parent_path.split('/') if b])
 
     def _get_youngest_state(self, states):
         index = min([self._get_state_score(state) for state in states])
@@ -315,7 +327,11 @@ class BuildResult(models.Model):
                 build_by_old_values[record.local_state] += record
         local_result = values.get('local_result')
         for build in self:
-            assert not local_result or local_result == self._get_worst_result([build.local_result, local_result])  # dont write ok on a warn/error build
+            if local_result and local_result != self._get_worst_result([build.local_result, local_result]):  # dont write ok on a warn/error build
+                if len(self) == 1:
+                    values.pop('local_result')
+                else:
+                    raise ValidationError('Local result cannot be set to a less critical level')
         res = super(BuildResult, self).write(values)
         if 'log_counter' in values:  # not 100% usefull but more correct ( see test_ir_logging)
             self.flush()
@@ -374,9 +390,15 @@ class BuildResult(models.Model):
             else:
                 build.domain = "%s:%s" % (domain, build.port)
 
+    @api.depends_context('batch')
     def _compute_build_url(self):
+        batch = self.env.context.get('batch')
+        print(self.env.context)
         for build in self:
-            build.build_url = "/runbot/build/%s" % build.id
+            if batch:
+                build.build_url = "/runbot/batch/%s/build/%s" % (batch.id, build.id)
+            else:
+                build.build_url = "/runbot/build/%s" % build.id
 
     @api.depends('job_start', 'job_end')
     def _compute_job_time(self):
@@ -651,10 +673,11 @@ class BuildResult(models.Model):
                     build._log('_schedule', '%s time exceeded (%ss)' % (build.active_step.name if build.active_step else "?", build.job_time))
                     build._kill(result='killed')
                 continue
-            elif _docker_state in ('UNKNOWN', 'GHOST') and (build.local_state == 'running' or build.active_step._is_docker_step()):
-                if build.job_time < 5:
+            elif _docker_state in ('UNKNOWN', 'GHOST') and (build.local_state == 'running' or build.active_step._is_docker_step()):  # todo replace with docker_start
+                docker_time = time.time() - dt2time(build.docker_start or build.job_start)
+                if docker_time < 5:
                     continue
-                elif build.job_time < 60:
+                elif docker_time < 60:
                     _logger.info('container "%s" seems too take a while to start :%s' % (build.job_time, build._get_docker_name()))
                     continue
                 else:
@@ -662,6 +685,7 @@ class BuildResult(models.Model):
             # No job running, make result and select nex job
             build_values = {
                 'job_end': now(),
+                'docker_start': False,
             }
             # make result of previous job
             try:
@@ -723,6 +747,11 @@ class BuildResult(models.Model):
         containers_memory_limit = self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_containers_memory', 0)
         if containers_memory_limit and 'memory' not in kwargs:
             kwargs['memory'] = int(float(containers_memory_limit) * 1024 ** 3)
+        self.docker_start = now()
+        if self.job_start:
+            start_step_time = int(dt2time(self.docker_start) - dt2time(self.job_start))
+            if start_step_time > 60:
+                _logger.info('Step took %s seconds before starting docker', start_step_time)
         docker_run(**kwargs)
 
     def _path(self, *l, **kw):
@@ -749,6 +778,7 @@ class BuildResult(models.Model):
     def _checkout(self):
         self.ensure_one()  # will raise exception if hash not found, we don't want to fail for all build.
         # checkout branch
+        start = time.time()
         exports = {}
         for commit in self.env.context.get('defined_commit_ids') or self.params_id.commit_ids:
             build_export_path = self._docker_source_folder(commit)
@@ -756,6 +786,11 @@ class BuildResult(models.Model):
                 self._log('_checkout', 'Multiple repo have same export path in build, some source may be missing for %s' % build_export_path, level='ERROR')
                 self._kill(result='ko')
             exports[build_export_path] = commit.export()
+
+        checkout_time = time.time() - start
+        if checkout_time > 60:
+            self._log('checkout', 'Checkout took %s seconds' % int(checkout_time))
+
         return exports
 
     def _get_available_modules(self):
@@ -995,7 +1030,13 @@ class BuildResult(models.Model):
             # means that a step has been run manually without using config
             return {'active_step': False, 'local_state': 'done'}
 
-        next_index = step_ids.index(self.active_step) + 1 if self.active_step else 0
+        if not self.active_step:
+            next_index = 0
+        else:
+            if self.active_step not in step_ids:
+                self._log('run', 'Config was modified and current step does not exists anymore, skipping.', level='ERROR')
+                return {'active_step': False, 'local_state': 'done', 'local_result': self._get_worst_result([self.local_result, 'ko'])}
+            next_index = step_ids.index(self.active_step) + 1
 
         while True:
             if next_index >= len(step_ids):  # final job, build is done
@@ -1118,5 +1159,5 @@ class BuildResult(models.Model):
                 if trigger.ci_context:
                     for build_commit in self.params_id.commit_link_ids:
                         commit = build_commit.commit_id
-                        if build_commit.match_type != 'default' and commit.repo_id in trigger.repo_ids:
+                        if 'base_' not in build_commit.match_type and commit.repo_id in trigger.repo_ids:
                             commit._github_status(build, trigger.ci_context, state, target_url, desc, post_commit)
